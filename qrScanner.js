@@ -1,7 +1,8 @@
 // barcodeScannerExample.js
-import { LightningElement } from 'lwc';
+import { LightningElement, wire } from 'lwc';
 import { ShowToastEvent } from 'lightning/platformShowToastEvent';
 import { getBarcodeScanner } from 'lightning/mobileCapabilities';
+import makeMockApiCall from '@salesforce/apex/QrScanner.makeMockApiCall';
 
 export default class QrScanner extends LightningElement {
     myScanner;
@@ -109,31 +110,15 @@ export default class QrScanner extends LightningElement {
         }
     }
 
-    // Method to make a callout to the mock API with the scanned barcode value
+    // Method to make a callout to Apex method with the scanned barcode value
     makeMockApiCall(scannedValue) {
-        // Replace 'your_mock_api_endpoint' with the actual endpoint of your mock API
-        const mockApiEndpoint = 'https://65f7fd48b4f842e808869009.mockapi.io';
-        fetch(mockApiEndpoint, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                barcode: scannedValue
+        makeMockApiCall({ scannedValue })
+            .then(result => {
+                console.log('Mock API response:', result);
+                // Handle the response data from the mock API
             })
-        })
-        .then(response => {
-            if (!response.ok) {
-                throw new Error('Failed to make mock API call');
-            }
-            return response.json();
-        })
-        .then(data => {
-            // Handle the response data from the mock API
-            console.log('Mock API response:', data);
-        })
-        .catch(error => {
-            console.error('Error making mock API call:', error);
-        });
+            .catch(error => {
+                console.error('Error making mock API call:', error);
+            });
     }
 }
