@@ -2,7 +2,7 @@
 import { LightningElement, wire } from 'lwc';
 import { ShowToastEvent } from 'lightning/platformShowToastEvent';
 import { getBarcodeScanner } from 'lightning/mobileCapabilities';
-import makeMockApiCall from '@salesforce/apex/QrScanner.makeMockApiCall';
+import makeMockApiCall from '@salesforce/apex/QrScannerController.makeMockApiCall';
 
 export default class QrScanner extends LightningElement {
     myScanner;
