@@ -1,15 +1,14 @@
 // barcodeScannerExample.js
-import { LightningElement, wire } from 'lwc';
+import { LightningElement } from 'lwc';
 import { ShowToastEvent } from 'lightning/platformShowToastEvent';
 import { getBarcodeScanner } from 'lightning/mobileCapabilities';
-import makeMockApiCall from '@salesforce/apex/QrScannerController.makeMockApiCall';
+import makeMockApiCall from '@salesforce/apex/QrScanner.makeMockApiCall';
 
 export default class QrScanner extends LightningElement {
     myScanner;
     scanButtonDisabled = false;
     scannedBarcode = '';
 
-    // When component is initialized, detect whether to enable Scan button
     connectedCallback() {
         this.myScanner = getBarcodeScanner();
         if (this.myScanner == null || !this.myScanner.isAvailable()) {
@@ -17,12 +16,9 @@ export default class QrScanner extends LightningElement {
         }
     }
 
-    handleBeginScanClick(event) {
-        // Reset scannedBarcode to empty string before starting new scan
+    handleBeginScanClick() {
         this.scannedBarcode = '';
 
-        // Make sure BarcodeScanner is available before trying to use it
-        // Note: We _also_ disable the Scan button if there's no BarcodeScanner
         if (this.myScanner != null && this.myScanner.isAvailable()) {
             const scanningOptions = {
                 barcodeTypes: [this.myScanner.barcodeTypes.QR],
@@ -32,19 +28,8 @@ export default class QrScanner extends LightningElement {
             this.myScanner
                 .beginCapture(scanningOptions)
                 .then((result) => {
-                    console.log(result);
-
-                    // Do something with the barcode scan value:
-                    // - look up a record
-                    // - create or update a record
-                    // - parse data and put values into a form
-                    // - and so on; this is YOUR code
-                    // Here, we just display the scanned value in the UI
                     this.scannedBarcode = result.value;
-
-                    // Make a callout to the mock API with the scanned barcode value
                     this.makeMockApiCall(this.scannedBarcode);
-                    
                     this.dispatchEvent(
                         new ShowToastEvent({
                             title: 'Successful Scan',
@@ -54,27 +39,21 @@ export default class QrScanner extends LightningElement {
                     );
                 })
                 .catch((error) => {
-                    // Handle cancellation and unexpected errors here
                     console.error(error);
-
                     if (error.code == 'userDismissedScanner') {
-                        // User clicked Cancel
                         this.dispatchEvent(
                             new ShowToastEvent({
                                 title: 'Scanning Cancelled',
-                                message:
-                                    'You cancelled the scanning session.',
+                                message: 'You cancelled the scanning session.',
                                 mode: 'sticky'
                             })
                         );
                     }
                     else { 
-                        // Inform the user we ran into something unexpected
                         this.dispatchEvent(
                             new ShowToastEvent({
                                 title: 'Barcode Scanner Error',
-                                message:
-                                    'There was a problem scanning the barcode: ' +
+                                message: 'There was a problem scanning the barcode: ' +
                                     error.message,
                                 variant: 'error',
                                 mode: 'sticky'
@@ -83,42 +62,50 @@ export default class QrScanner extends LightningElement {
                     }
                 })
                 .finally(() => {
-                    console.log('#finally');
-
-                    // Clean up by ending capture,
-                    // whether we completed successfully or had an error
                     this.myScanner.endCapture();
                 });
         } else {
-            // BarcodeScanner is not available
-            // Not running on hardware with a camera, or some other context issue
-            console.log(
-                'Scan Barcode button should be disabled and unclickable.'
-            );
-            console.log('Somehow it got clicked: ');
-            console.log(event);
-
-            // Let user know they need to use a mobile phone with a camera
             this.dispatchEvent(
                 new ShowToastEvent({
                     title: 'Barcode Scanner Is Not Available',
-                    message:
-                        'Try again from the Salesforce app on a mobile device.',
+                    message: 'Try again from the Salesforce app on a mobile device.',
                     variant: 'error'
                 })
             );
         }
     }
 
-    // Method to make a callout to Apex method with the scanned barcode value
     makeMockApiCall(scannedValue) {
         makeMockApiCall({ scannedValue })
             .then(result => {
                 console.log('Mock API response:', result);
-                // Handle the response data from the mock API
+                if (result === true) {
+                    this.dispatchEvent(
+                        new ShowToastEvent({
+                            title: 'Product Found',
+                            message: 'The product was found.',
+                            variant: 'success'
+                        })
+                    );
+                } else {
+                    this.dispatchEvent(
+                        new ShowToastEvent({
+                            title: 'No Product Found',
+                            message: 'No product was found.',
+                            variant: 'warning'
+                        })
+                    );
+                }
             })
             .catch(error => {
                 console.error('Error making mock API call:', error);
+                this.dispatchEvent(
+                    new ShowToastEvent({
+                        title: 'Error',
+                        message: 'An error occurred while processing your request.',
+                        variant: 'error'
+                    })
+                );
             });
     }
 }
