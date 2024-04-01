@@ -1,0 +1,13 @@
+<template>
+    <lightning-card title="Asset Form">
+        <div class="slds-p-around_medium">
+            <lightning-input label="Brand Name" value={brandName} onchange={handleBrandNameChange}></lightning-input>
+            <lightning-input label="Asset Type" value={assetType} onchange={handleAssetTypeChange}></lightning-input>
+            <lightning-input label="Asset Name" value={assetName} onchange={handleAssetNameChange}></lightning-input>
+            <lightning-input label="Capacity" type="number" value={capacity} onchange={handleCapacityChange}></lightning-input>
+            <lightning-input label="Age of Product" type="number" value={ageOfProduct} onchange={handleAgeOfProductChange}></lightning-input>
+            <lightning-input label="Manufacturing Date" type="date" value={manufacturingDate} onchange={handleManufacturingDateChange}></lightning-input>
+            <input type="file" accept=".jpg, .png" onchange={handleFileChange}></input>
+        </div>
+    </lightning-card>
+</template>
