@@ -1,4 +1,6 @@
+<!-- assetOnboardingScreen.html -->
 <template>
+    <lightning-radio-group name="options" options={radioOptions} value={selectedOption} onchange={handleOptionChange}></lightning-radio-group>
     <lightning-input label="Enter Item Code" value={itemCode} onchange={handleInputChange}></lightning-input>
     <lightning-button label="Scan Barcode" onclick={handleScan}></lightning-button>
     <lightning-button label="Make Callout" onclick={handleCallout}></lightning-button>
