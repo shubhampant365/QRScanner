@@ -1,14 +1,28 @@
+// assetOnboardingScreen.js
 import { LightningElement, track } from 'lwc';
 import { ShowToastEvent } from 'lightning/platformShowToastEvent';
-import makeCallout from '@salesforce/apex/RecordCallerController.makeCallout';
+import makeCalloutAppliances from '@salesforce/apex/RecordCallerController.makeCalloutAppliances';
+import makeCalloutLocks from '@salesforce/apex/QrScanner.makeMockApiCall';
 import { getBarcodeScanner } from 'lightning/mobileCapabilities';
 
 export default class AssetOnboardingScreen extends LightningElement {
+    @track selectedOption = 'Appliances';
     @track itemCode;
     barcodeScanner;
 
+    get radioOptions() {
+        return [
+            { label: 'Appliances', value: 'Appliances' },
+            { label: 'Locks', value: 'Locks' },
+        ];
+    }
+
     connectedCallback() {
         this.barcodeScanner = getBarcodeScanner();
+    }
+
+    handleOptionChange(event) {
+        this.selectedOption = event.detail.value;
     }
 
     handleInputChange(event) {
@@ -43,7 +57,25 @@ export default class AssetOnboardingScreen extends LightningElement {
     }
 
     handleCallout() {
-        makeCallout({ itemCode: this.itemCode })
+        if (this.selectedOption === 'Appliances') {
+            this.makeCalloutAppliances();
+        } else if (this.selectedOption === 'Locks') {
+            this.makeCalloutLocks();
+        }
+    }
+
+    makeCalloutAppliances() {
+        makeCalloutAppliances({ itemCode: this.itemCode })
+            .then(result => {
+                this.showToast('Success', result, 'success');
+            })
+            .catch(error => {
+                this.showToast('Error', error.body.message, 'error');
+            });
+    }
+
+    makeCalloutLocks() {
+        makeCalloutLocks({ itemCode: this.itemCode })
             .then(result => {
                 this.showToast('Success', result, 'success');
             })
