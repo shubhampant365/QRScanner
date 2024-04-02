@@ -4,4 +4,6 @@
     <lightning-input label="Enter Item Code" value={itemCode} onchange={handleInputChange}></lightning-input>
     <lightning-button label="Scan Barcode" onclick={handleScan}></lightning-button>
     <lightning-button label="Make Callout" onclick={handleCallout}></lightning-button>
+    <lightning-input type="file" label="Upload Invoice" onchange={handleFileUpload}></lightning-input>
+    <lightning-button label="Transfer the Asset" onclick={handleTransferClick} if:true={isSerialIdLinkedResult}></lightning-button>
 </template>
