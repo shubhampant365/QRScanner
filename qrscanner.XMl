@@ -11,3 +11,46 @@
         <target>lightning__RecordAction</target>
     </targets>
 </LightningComponentBundle>
+
+@AuraEnabled(cacheable=true)
+    public static String makeCalloutAppliances(String recordData) {
+        
+        HttpRequest request = new HttpRequest();
+        request.setEndpoint('https://api.example.com');
+        request.setMethod('GET');
+        HttpResponse response = new Http().send(request);
+        return response.getBody();
+    }
+    
+    @AuraEnabled(cacheable=true)
+    public static Boolean isSerialIdLinked(String serialId) {
+        if (String.isBlank(serialId)) {
+            return true; // Return false if serialId is null or empty
+        }
+        
+        // Perform query to check if the serial ID is linked with any existing asset records
+        List<Asset> linkedAssets = [SELECT Id FROM Asset WHERE SerialNumber = :serialId LIMIT 1];
+        return !linkedAssets.isEmpty();
+    }
+    
+    @AuraEnabled(cacheable=false)
+    public static void saveAttachment(Id parentId, String fileName, String base64Data) {
+        try {
+            // Decode base64Data to Blob
+            Blob fileBlob = EncodingUtil.base64Decode(base64Data);
+            List<ContentVersion> contentVersions = new List<contentVersion>();            
+            ContentVersion cv = new ContentVersion(
+                Title = fileName,
+                PathOnClient = fileName,
+                VersionData = EncodingUtil.base64Decode(base64Data),
+                FirstPublishLocationId = parentId
+            );
+            contentVersions.add(cv);
+            
+            insert contentVersions;
+            
+            
+        } catch (Exception ex) {
+            throw new AuraHandledException('Error occurred while saving attachment: ' + ex.getMessage());
+        }
+    }
