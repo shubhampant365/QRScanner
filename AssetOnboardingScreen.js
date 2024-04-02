@@ -1,15 +1,19 @@
 // assetOnboardingScreen.js
-import { LightningElement, track } from 'lwc';
+import { LightningElement, track,api } from 'lwc';
 import { ShowToastEvent } from 'lightning/platformShowToastEvent';
 import makeCalloutAppliances from '@salesforce/apex/RecordCallerController.makeCalloutAppliances';
 import makeCalloutLocks from '@salesforce/apex/QrScanner.makeMockApiCall';
+import isSerialIdLinked from '@salesforce/apex/RecordCallerController.isSerialIdLinked';
+import uploadFile from '@salesforce/apex/RecordCallerController.saveAttachment';
 import { getBarcodeScanner } from 'lightning/mobileCapabilities';
 
 export default class AssetOnboardingScreen extends LightningElement {
     @track selectedOption = 'Appliances';
     @track itemCode;
     barcodeScanner;
-
+    @api recordId;
+    @track files = [];
+    @track isSerialIdLinkedResult = false;
     get radioOptions() {
         return [
             { label: 'Appliances', value: 'Appliances' },
@@ -28,6 +32,46 @@ export default class AssetOnboardingScreen extends LightningElement {
     handleInputChange(event) {
         this.itemCode = event.target.value;
     }
+
+    handleFileUpload(event) {
+        const file = event.target.files[0];
+        const reader = new FileReader();
+        
+        reader.onload = () => {
+            this.fileData = {
+                fileName: file.name,
+                base64Data: reader.result.split(',')[1]
+            };
+            this.handleSaveDocument(); // Call handleSaveDocument method here
+        };
+
+        reader.readAsDataURL(file);
+    }
+    
+    handleSaveDocument() {
+        if (!this.fileData) {
+            return;
+        }
+        uploadFile({ parentId: this.recordId,fileName: this.fileData.fileName, base64Data: this.fileData.base64Data })
+            .then(result => {
+                this.showSuccessToast('Document uploaded successfully');
+                console.log('Document saved successfully:', result);
+            })
+            .catch(error => {
+                console.error('Error saving document:', error);
+            });
+    }
+
+    showSuccessToast(message) {
+        const event = new ShowToastEvent({
+            title: 'Success',
+            message: message,
+            variant: 'success',
+        });
+        this.dispatchEvent(event);
+    }
+
+   
 
     handleScan() {
         if (this.barcodeScanner.isAvailable()) {
@@ -49,19 +93,35 @@ export default class AssetOnboardingScreen extends LightningElement {
                     this.barcodeScanner.dismiss();
                 });
         } else {
-            // Scanner not available
-            // Not running on hardware with a scanner
-            // Handle with message, error, beep, and so on
             this.showToast('Error', 'Barcode scanner is not available', 'error');
         }
     }
 
     handleCallout() {
-        if (this.selectedOption === 'Appliances') {
-            this.makeCalloutAppliances();
-        } else if (this.selectedOption === 'Locks') {
-            this.makeCalloutLocks();
+        if (!this.itemCode) {
+            this.showToast('Warning', 'Please enter a value in the input field.', 'warning');
+            return;
         }
+
+        isSerialIdLinked({ serialId: this.itemCode })
+            .then(result => {
+                this.isSerialIdLinkedResult = result;
+                if (result) {
+                    this.showToast('Warning', 'The scanned serial ID is already linked with an existing asset.', 'warning');
+                } else {
+                    if (this.selectedOption === 'Appliances') {
+                        this.makeCalloutAppliances();
+                    } else if (this.selectedOption === 'Locks') {
+                        this.makeCalloutLocks();
+                    }
+                }
+            })
+            .catch(error => {
+                this.showToast('Error', error.body.message, 'error');
+            });
+    }
+
+    handleTransferClick() {
     }
 
     makeCalloutAppliances() {
@@ -75,7 +135,7 @@ export default class AssetOnboardingScreen extends LightningElement {
     }
 
     makeCalloutLocks() {
-        makeCalloutLocks({ itemCode: this.itemCode })
+        makeCalloutLocks({ scannedValue: this.itemCode }) // Pass scannedValue to the Apex method
             .then(result => {
                 this.showToast('Success', result, 'success');
             })
