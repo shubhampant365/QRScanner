@@ -1,9 +1,15 @@
-<!-- assetOnboardingScreen.html -->
 <template>
-    <lightning-radio-group name="options" options={radioOptions} value={selectedOption} onchange={handleOptionChange}></lightning-radio-group>
-    <lightning-input label="Enter Item Code" value={itemCode} onchange={handleInputChange}></lightning-input>
-    <lightning-button label="Scan Barcode" onclick={handleScan}></lightning-button>
-    <lightning-button label="Make Callout" onclick={handleCallout}></lightning-button>
-    <lightning-input type="file" label="Upload Invoice" onchange={handleFileUpload}></lightning-input>
-    <lightning-button label="Transfer the Asset" onclick={handleTransferClick} if:true={isSerialIdLinkedResult}></lightning-button>
+    <div class="container slds-p-vertical_small">
+        <lightning-button label="Scan Code" onclick={handleScan} class="assetOnboardingScreen__scanButton slds-m-around_medium"></lightning-button>
+        
+        <fieldset class="itemDetails slds-m-around_medium">
+            <lightning-radio-group label="Select the BU" name="options" options={radioOptions} value={selectedOption} onchange={handleOptionChange}></lightning-radio-group>
+            <lightning-input label="Enter Item Code" value={itemCode} onchange={handleInputChange}></lightning-input>
+            <lightning-input type="file" label="Upload Invoice" onchange={handleFileUpload}></lightning-input>
+        </fieldset>
+        
+        <lightning-button label="Submit" onclick={handleCallout} class="submitButton"></lightning-button>
+        
+        <lightning-button label="Transfer the Asset" onclick={handleTransferClick} if:true={isSerialIdLinkedResult} class="slds-m-left_small"></lightning-button>
+    </div>
 </template>
