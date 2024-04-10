@@ -14,6 +14,14 @@ export default class AssetOnboardingScreen extends LightningElement {
     @api recordId;
     @track files = [];
     @track isSerialIdLinkedResult = false;
+
+    constructor(){
+        super();
+        const style = document.createElement('style');
+        style.innerText = '.slds-form-element__control{display:flex}';
+        document.querySelector('head').appendChild(style);
+    }
+
     get radioOptions() {
         return [
             { label: 'Appliances', value: 'Appliances' },
