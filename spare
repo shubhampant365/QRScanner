@@ -25,3 +25,67 @@
         </div>
     </lightning-card>
 </template>
+
+
+
+
+
+// formFields.js
+import { LightningElement, track } from 'lwc';
+
+export default class FormFields extends LightningElement {
+    @track issue;
+    @track partCode;
+    @track modelNumber;
+    @track reasonForReplacement;
+    @track quantity;
+    @track selectedDeliveryOption;
+    @track workOrderId;
+
+    deliveryOptions = [
+        { label: 'ASP', value: 'ASP' },
+        { label: 'Customer', value: 'Customer' }
+    ];
+
+    handleIssueChange(event) {
+        this.issue = event.target.value;
+    }
+
+    handlePartCodeChange(event) {
+        this.partCode = event.target.value;
+    }
+
+    handleModelNumberChange(event) {
+        this.modelNumber = event.target.value;
+    }
+
+    handleReasonChange(event) {
+        this.reasonForReplacement = event.target.value;
+    }
+
+    handleQuantityChange(event) {
+        this.quantity = event.target.value;
+    }
+
+    handleWorkOrderIdChange(event) {
+        this.workOrderId = event.detail.value[0];
+    }
+
+    handleDeliveryChange(event) {
+        this.selectedDeliveryOption = event.detail.value;
+    }
+
+    handleSerialNumberChange(event) {
+        const file = event.target.files[0];
+        // Handle file upload logic for serial number photo
+    }
+
+    handleInvoicePhotoChange(event) {
+        const file = event.target.files[0];
+        // Handle file upload logic for invoice photo
+    }
+
+    handleSave() {
+        // Call Apex method to save data
+    }
+}
