@@ -1,0 +1,24 @@
+<!-- formFields.html -->
+<template>
+    <lightning-card title="Issue Form" icon-name="utility:record">
+        <div class="slds-p-around_medium">
+            <div class="slds-grid slds-wrap">
+                <div class="slds-size_1-of-2 slds-p-vertical_medium">
+                    <lightning-input label="Issue" value={issue} onchange={handleIssueChange}></lightning-input>
+                    <lightning-input label="Part Code" value={partCode} onchange={handlePartCodeChange}></lightning-input>
+                    <lightning-input label="Model Number" value={modelNumber} onchange={handleModelNumberChange}></lightning-input>
+                    <lightning-input label="Reason for Replacement" value={reasonForReplacement} onchange={handleReasonChange}></lightning-input>
+                    <lightning-input label="Quantity" type="number" value={quantity} onchange={handleQuantityChange}></lightning-input>
+                    <lightning-combobox label="Address of Material Delivery" options={deliveryOptions} value={selectedDeliveryOption} onchange={handleDeliveryChange}></lightning-combobox>
+                </div>
+                <div class="slds-size_1-of-2 slds-p-vertical_medium">
+                    <lightning-input label="Work Order Id" value={workOrderId} disabled></lightning-input>
+                    <div class="custom-file-upload">
+                        <lightning-input label="Upload Photo with Serial Number" type="file" onchange={handleSerialNumberChange}></lightning-input>
+                        <lightning-input label="Customer Invoice Photograph" type="file" onchange={handleInvoicePhotoChange}></lightning-input>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </lightning-card>
+</template>
