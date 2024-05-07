@@ -31,7 +31,8 @@
 
 
 // formFields.js
-import { LightningElement, track } from 'lwc';
+import { LightningElement, track, wire } from 'lwc';
+import saveFormData from '@salesforce/apex/YourApexClass.saveFormData';
 
 export default class FormFields extends LightningElement {
     @track issue;
@@ -41,6 +42,8 @@ export default class FormFields extends LightningElement {
     @track quantity;
     @track selectedDeliveryOption;
     @track workOrderId;
+    @track serialNumberFile;
+    @track invoiceFile;
 
     deliveryOptions = [
         { label: 'ASP', value: 'ASP' },
@@ -76,16 +79,35 @@ export default class FormFields extends LightningElement {
     }
 
     handleSerialNumberChange(event) {
-        const file = event.target.files[0];
-        // Handle file upload logic for serial number photo
+        this.serialNumberFile = event.target.files[0];
     }
 
     handleInvoicePhotoChange(event) {
-        const file = event.target.files[0];
-        // Handle file upload logic for invoice photo
+        this.invoiceFile = event.target.files[0];
     }
 
     handleSave() {
+        // Prepare data to send to Apex method
+        const formData = {
+            issue: this.issue,
+            partCode: this.partCode,
+            modelNumber: this.modelNumber,
+            reasonForReplacement: this.reasonForReplacement,
+            quantity: this.quantity,
+            selectedDeliveryOption: this.selectedDeliveryOption,
+            workOrderId: this.workOrderId,
+            serialNumberFile: this.serialNumberFile,
+            invoiceFile: this.invoiceFile
+        };
+
         // Call Apex method to save data
+        saveFormData({ formData: formData })
+            .then(result => {
+                // Handle success
+            })
+            .catch(error => {
+                // Handle error
+            });
     }
 }
+
