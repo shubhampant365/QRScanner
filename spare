@@ -111,3 +111,25 @@ export default class FormFields extends LightningElement {
     }
 }
 
+
+
+// YourApexClass.cls
+public with sharing class YourApexClass {
+
+    @AuraEnabled
+    public static void saveFormData(Map<String, Object> formData) {
+        // Retrieve data from formData map
+        String issue = (String)formData.get('issue');
+        String partCode = (String)formData.get('partCode');
+        String modelNumber = (String)formData.get('modelNumber');
+        String reasonForReplacement = (String)formData.get('reasonForReplacement');
+        Integer quantity = (Integer)formData.get('quantity');
+        String selectedDeliveryOption = (String)formData.get('selectedDeliveryOption');
+        Id workOrderId = (Id)formData.get('workOrderId');
+        Blob serialNumberFile = (Blob)formData.get('serialNumberFile');
+        Blob invoiceFile = (Blob)formData.get('invoiceFile');
+        
+        // Perform further processing or database operations with the retrieved data
+    }
+}
+
