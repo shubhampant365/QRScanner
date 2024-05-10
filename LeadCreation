@@ -1,0 +1,174 @@
+<!-- createLeadForm.html -->
+<template>
+    <lightning-card title="Create Lead">
+        <div class="slds-p-around_medium">
+            <div class="slds-grid slds-gutters">
+                <div class="slds-col">
+                    <lightning-record-picker
+                        label="Product"
+                        placeholder="Select Product"
+                        onchange={handleProductSelect}
+                        object-api-name="Product2">
+                    </lightning-record-picker>
+                    <lightning-input label="Product Name" value={productName} onchange={handleProductNameChange}></lightning-input>
+                    <lightning-input label="Quantity" type="number" onchange={handleQuantityChange}></lightning-input>
+                    <lightning-input label="Discount" type="number" step="0.01" onchange={handleDiscountChange}></lightning-input>
+                    <lightning-input label="Final Sale Price" value={finalSalePrice} onchange={handleFinalSalePriceChange}></lightning-input>
+                    <lightning-combobox label="Preferred Time to Call" options={preferredTimeOptions} onchange={handlePreferredTimeSelect}></lightning-combobox>
+                    <lightning-combobox label="Bill to Location" options={billToLocationOptions} onchange={handleBillToLocationSelect}></lightning-combobox>
+                    <lightning-combobox label="Ship to Location" options={shipToLocationOptions} onchange={handleShipToLocationSelect}></lightning-combobox>
+                    <lightning-input type="checkbox" label="External Material Purchase" onchange={handleExternalMaterialChange}></lightning-input>
+                    <lightning-input label="Invoice Number" onchange={handleInvoiceNumberChange}></lightning-input>
+                    <lightning-input label="Invoice Date" type="date" onchange={handleInvoiceDateChange}></lightning-input>
+                    <lightning-combobox label="Existing Security Strength" options={existingSecurityStrengthOptions} onchange={handleExistingSecurityStrengthSelect}></lightning-combobox>
+                    <lightning-combobox label="Proposed Security Strength" options={proposedSecurityStrengthOptions} onchange={handleProposedSecurityStrengthSelect}></lightning-combobox>
+                    <lightning-combobox label="Entry Point" options={entryPointOptions} onchange={handleEntryPointSelect}></lightning-combobox>
+                    <lightning-combobox label="Competition Replaced" options={competitionReplacedOptions} onchange={handleCompetitionReplacedSelect}></lightning-combobox>
+                    <div class="slds-m-top_medium">
+                        <lightning-button label="Create Lead" onclick={createLead} variant="brand"></lightning-button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </lightning-card>
+</template>
+
+
+
+
+// createLeadForm.js
+import { LightningElement, track, wire } from 'lwc';
+import createLead from '@salesforce/apex/LeadController.createLead';
+import { ShowToastEvent } from 'lightning/platformShowToastEvent';
+
+export default class CreateLeadForm extends LightningElement {
+    @track selectedProductId;
+    @track productName;
+    @track quantity;
+    @track discount;
+    @track finalSalePrice;
+    @track selectedPreferredTime;
+    @track selectedBillToLocation;
+    @track selectedShipToLocation;
+    @track externalMaterialPurchase;
+    @track invoiceNumber;
+    @track invoiceDate;
+    @track selectedExistingSecurityStrength;
+    @track selectedProposedSecurityStrength;
+    @track selectedEntryPoint;
+    @track selectedCompetitionReplaced;
+
+    handleProductSelect(event) {
+        this.selectedProductId = event.detail.recordId;
+    }
+
+    handleProductNameChange(event) {
+        this.productName = event.target.value;
+    }
+
+    handleQuantityChange(event) {
+        this.quantity = event.target.value;
+    }
+
+    handleDiscountChange(event) {
+        this.discount = event.target.value;
+    }
+
+    handleFinalSalePriceChange(event) {
+        this.finalSalePrice = event.target.value;
+    }
+
+    handlePreferredTimeSelect(event) {
+        this.selectedPreferredTime = event.detail.value;
+    }
+
+    handleBillToLocationSelect(event) {
+        this.selectedBillToLocation = event.detail.value;
+    }
+
+    handleShipToLocationSelect(event) {
+        this.selectedShipToLocation = event.detail.value;
+    }
+
+    handleExternalMaterialChange(event) {
+        this.externalMaterialPurchase = event.target.checked;
+    }
+
+    handleInvoiceNumberChange(event) {
+        this.invoiceNumber = event.target.value;
+    }
+
+    handleInvoiceDateChange(event) {
+        this.invoiceDate = event.target.value;
+    }
+
+    handleExistingSecurityStrengthSelect(event) {
+        this.selectedExistingSecurityStrength = event.detail.value;
+    }
+
+    handleProposedSecurityStrengthSelect(event) {
+        this.selectedProposedSecurityStrength = event.detail.value;
+    }
+
+    handleEntryPointSelect(event) {
+        this.selectedEntryPoint = event.detail.value;
+    }
+
+    handleCompetitionReplacedSelect(event) {
+        this.selectedCompetitionReplaced = event.detail.value;
+    }
+
+    createLead() {
+        createLead({
+            selectedProductId: this.selectedProductId,
+            productName: this.productName,
+            quantity: this.quantity,
+            discount: this.discount,
+            finalSalePrice: this.finalSalePrice,
+            preferredTime: this.selectedPreferredTime,
+            billToLocation: this.selectedBillToLocation,
+            shipToLocation: this.selectedShipToLocation,
+            externalMaterialPurchase: this.externalMaterialPurchase,
+            invoiceNumber: this.invoiceNumber,
+            invoiceDate: this.invoiceDate,
+            existingSecurityStrength: this.selectedExistingSecurityStrength,
+            proposedSecurityStrength: this.selectedProposedSecurityStrength,
+            entryPoint: this.selectedEntryPoint,
+            competitionReplaced: this.selectedCompetitionReplaced
+        })
+        .then(result => {
+            this.showToast('Success', result, 'success');
+            this.resetForm();
+        })
+        .catch(error => {
+            this.showToast('Error', error.body.message, 'error');
+        });
+    }
+
+    showToast(title, message, variant) {
+        const event = new ShowToastEvent({
+            title: title,
+            message: message,
+            variant: variant
+        });
+        this.dispatchEvent(event);
+    }
+
+    resetForm() {
+        this.selectedProductId = null;
+        this.productName = null;
+        this.quantity = null;
+        this.discount = null;
+        this.finalSalePrice = null;
+        this.selectedPreferredTime = null;
+        this.selectedBillToLocation = null;
+        this.selectedShipToLocation = null;
+        this.externalMaterialPurchase = false;
+        this.invoiceNumber = null;
+        this.invoiceDate = null;
+        this.selectedExistingSecurityStrength = null;
+        this.selectedProposedSecurityStrength = null;
+        this.selectedEntryPoint = null;
+        this.selectedCompetitionReplaced = null;
+    }
+}
