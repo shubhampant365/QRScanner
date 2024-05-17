@@ -1,0 +1,30 @@
+public class ContentDocumentLinkHelper {
+    public static void updateVisibilityForKnowledgeArticles(Map<Id, ContentDocumentLink> newContentDocumentLinks) {
+        // Create a list to store the records that need updating
+        List<ContentDocumentLink> linksToUpdate = new List<ContentDocumentLink>();
+        
+        // Iterate over the map entries
+        for (ContentDocumentLink cdl : newContentDocumentLinks.values()) {
+            // Check if the linked entity is a Knowledge Article
+            // KnowledgeArticleVersion is used to check because the entity is a Knowledge Article
+            if (cdl.LinkedEntityId != null && cdl.LinkedEntityId.startsWith('ka0')) {
+                // Set the Visibility to AllUsers
+                ContentDocumentLink updatedLink = new ContentDocumentLink(
+                    Id = cdl.Id,
+                    Visibility = 'AllUsers'
+                );
+                linksToUpdate.add(updatedLink);
+            }
+        }
+        
+        // Perform the update DML operation outside the loop
+        if (!linksToUpdate.isEmpty()) {
+            try {
+                update linksToUpdate;
+            } catch (DmlException e) {
+                // Handle the exception if the update fails
+                System.debug('Error updating ContentDocumentLink visibility: ' + e.getMessage());
+            }
+        }
+    }
+}
