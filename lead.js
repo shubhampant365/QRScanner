@@ -79,4 +79,21 @@ export default class HelloWorld extends LightningElement {
             .then(leadId => {
                 this.showToast('Success', 'Lead created successfully', 'success');
                 console.log('Lead created with Id: ' + leadId);
-                // Optionally, perform any
+                // Optionally, perform any additional actions after lead creation
+            })
+            .catch(error => {
+                this.showToast('Error', 'Error creating lead: ' + error.body.message, 'error');
+                console.error('Error creating lead: ' + JSON.stringify(error));
+                // Optionally, handle errors here
+            });
+    }
+
+    showToast(title, message, variant) {
+        const toastEvent = new ShowToastEvent({
+            title: title,
+            message: message,
+            variant: variant
+        });
+        this.dispatchEvent(toastEvent);
+    }
+}
