@@ -36,3 +36,38 @@
 
 
 
+
+
+
+
+
+
+
+public with sharing class ProductController {
+    @AuraEnabled(cacheable=true)
+    public static List<ProductItem> getProductItems(String locationId) {
+        locationId = '1315g000000lQpvAAE';
+        // Query and return product items from the specified location
+        return [SELECT Id, Product2.Name, QuantityOnHand FROM ProductItem WHERE LocationId = :locationId];
+    }
+
+    @AuraEnabled
+    public static void updateRequestedQuantity(String productId, Integer requestedQuantity) {
+        // Implement logic to update requested quantity against the product ID
+        // Subtract requested quantity from quantity on hand directly
+        System.debug('ProductId------>' + productId);
+        System.debug('RequestedQuanity-->' + requestedQuantity);
+        ProductItem productItem = new ProductItem(Id = productId);
+        if (requestedQuantity >= 0) {
+            // Subtract requested quantity from quantity on hand
+            productItem.QuantityOnHand = requestedQuantity;
+            update productItem;
+        } else {
+            throw new AuraHandledException('Invalid requested quantity.');
+        }
+    }
+}
+
+
+
+
