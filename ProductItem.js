@@ -1,5 +1,4 @@
 import { LightningElement, wire } from 'lwc';
-import { ShowToastEvent } from 'lightning/platformShowToastEvent';
 import getProductItems from '@salesforce/apex/ProductController.getProductItems';
 import updateRequestedQuantity from '@salesforce/apex/ProductController.updateRequestedQuantity';
 import { refreshApex } from '@salesforce/apex';
@@ -7,6 +6,7 @@ import { refreshApex } from '@salesforce/apex';
 export default class ProductRequestComponent extends LightningElement {
     locationId = '1315g000000lQpvAAE';
     productItems;
+    searchTerm = '';
     refreshTable = false; // Flag to trigger table refresh
 
     @wire(getProductItems, { locationId: '$locationId' })
@@ -63,6 +63,16 @@ export default class ProductRequestComponent extends LightningElement {
             .catch(error => {
                 console.error('Error updating quantities:', error);
             });
+    }
+
+    handleSearch(event) {
+        this.searchTerm = event.target.value.toLowerCase();
+    }
+
+    get filteredProductItems() {
+        return this.productItems ? this.productItems.filter(
+            item => item.Product2.Name.toLowerCase().includes(this.searchTerm)
+        ) : [];
     }
 
     showToast(title, message, variant) {
