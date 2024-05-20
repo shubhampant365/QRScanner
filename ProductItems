@@ -1,7 +1,10 @@
 <template>
     <lightning-card title="Product Request">
         <div class="slds-p-around_medium">
-            <template if:true={productItems}>
+            <!-- Search input field -->
+            <lightning-input type="search" label="Search" value={searchTerm} onchange={handleSearch}></lightning-input>
+            
+            <template if:true={filteredProductItems}>
                 <table class="slds-table slds-table_cell-buffer slds-table_bordered">
                     <thead>
                         <tr>
@@ -11,7 +14,7 @@
                         </tr>
                     </thead>
                     <tbody>
-                        <template for:each={productItems} for:item="product">
+                        <template for:each={filteredProductItems} for:item="product">
                             <tr key={product.Id}>
                                 <td>{product.Product2.Name}</td>
                                 <td>{product.QuantityOnHand}</td>
@@ -26,12 +29,13 @@
                     <lightning-button label="Request" onclick={handleRequestAll}></lightning-button>
                 </div>
             </template>
-            <template if:false={productItems}>
+            <template if:false={filteredProductItems}>
                 No product items found.
             </template>
         </div>
     </lightning-card>
 </template>
+
 
 
 
