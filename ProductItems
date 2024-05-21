@@ -1,8 +1,10 @@
 <template>
     <lightning-card title="Product Request">
         <div class="slds-p-around_medium">
-            <!-- Search input field -->
-            <lightning-input type="search" label="Search" value={searchTerm} onchange={handleSearch}></lightning-input>
+            <!-- Search input field with improved CSS -->
+            <div class="search-wrapper">
+                <lightning-input type="search" label="Search" placeholder="Search products..." value={searchTerm} onchange={handleSearch}></lightning-input>
+            </div>
             
             <template if:true={filteredProductItems}>
                 <table class="slds-table slds-table_cell-buffer slds-table_bordered">
@@ -46,13 +48,12 @@
 
 
 
-
 public with sharing class ProductController {
     @AuraEnabled(cacheable=true)
     public static List<ProductItem> getProductItems(String locationId) {
         locationId = '1315g000000lQpvAAE';
         // Query and return product items from the specified location
-        return [SELECT Id, Product2.Name, QuantityOnHand FROM ProductItem WHERE LocationId = :locationId];
+        return [SELECT Id, Product2.Name, QuantityOnHand,Product2.ProductCode FROM ProductItem WHERE LocationId = :locationId];
     }
 
     @AuraEnabled
