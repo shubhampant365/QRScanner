@@ -2,6 +2,7 @@ import { LightningElement, wire } from 'lwc';
 import getProductItems from '@salesforce/apex/ProductController.getProductItems';
 import updateRequestedQuantity from '@salesforce/apex/ProductController.updateRequestedQuantity';
 import { refreshApex } from '@salesforce/apex';
+import { ShowToastEvent } from 'lightning/platformShowToastEvent';
 
 export default class ProductRequestComponent extends LightningElement {
     locationId = '1315g000000lQpvAAE';
@@ -9,10 +10,12 @@ export default class ProductRequestComponent extends LightningElement {
     searchTerm = '';
     refreshTable = false; // Flag to trigger table refresh
 
+    wiredProductItemsResult; // Hold the wired result for refreshApex
+
     @wire(getProductItems, { locationId: '$locationId' })
-    wiredProductItems(value) {
-        this.refreshTable = false; // Reset flag when data is refreshed
-        const { error, data } = value;
+    wiredProductItems(result) {
+        this.wiredProductItemsResult = result;
+        const { error, data } = result;
         if (data) {
             this.productItems = data.map(item => ({
                 ...item,
@@ -52,6 +55,7 @@ export default class ProductRequestComponent extends LightningElement {
                 .catch(error => {
                     // Handle error response
                     console.error('Error updating quantity for product:', product.Id, error);
+                    this.showToast('Error', 'Failed to update quantities.', 'error');
                 });
         });
 
@@ -59,6 +63,8 @@ export default class ProductRequestComponent extends LightningElement {
         Promise.all(promises)
             .then(() => {
                 this.refreshTable = true; // Set flag to refresh table
+                // Refresh the data from wire
+                refreshApex(this.wiredProductItemsResult);
             })
             .catch(error => {
                 console.error('Error updating quantities:', error);
@@ -71,7 +77,7 @@ export default class ProductRequestComponent extends LightningElement {
 
     get filteredProductItems() {
         return this.productItems ? this.productItems.filter(
-            item => item.Product2.Name.toLowerCase().includes(this.searchTerm)
+            item => item.Product2.Name.toLowerCase().includes(this.searchTerm) || item.Product2.ProductCode.toLowerCase().includes(this.searchTerm)
         ) : [];
     }
 
@@ -87,12 +93,5 @@ export default class ProductRequestComponent extends LightningElement {
     get showToastButtonDisabled() {
         // Disable the show toast button if the table is not refreshed
         return !this.refreshTable;
-    }
-
-    handleRefreshTable() {
-        // Refresh the table by resetting the flag
-        this.refreshTable = false;
-        // Refresh the table data
-        return refreshApex(this.productItems);
     }
 }
