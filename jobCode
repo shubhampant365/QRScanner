@@ -1,8 +1,24 @@
 <template>
     <lightning-messages></lightning-messages>
     <lightning-record-edit-form object-api-name="WorkOrderLineItem" record-id={recordId} onsuccess={handleSuccess}>
-        <lightning-input-field field-name="Job_Code_1__c"></lightning-input-field>
-        <lightning-input-field field-name="Job_Code_2__c"></lightning-input-field>
+        <lightning-combobox 
+            name="jobCode1" 
+            label="Job Code 1" 
+            value={jobCode1} 
+            placeholder="Select Job Code 1" 
+            options={jobCode1Options} 
+            onchange={handleJobCode1Change}>
+        </lightning-combobox>
+
+        <lightning-combobox 
+            name="jobCode2" 
+            label="Job Code 2" 
+            value={jobCode2} 
+            placeholder="Select Job Code 2" 
+            options={jobCode2Options} 
+            onchange={handleJobCode2Change}>
+        </lightning-combobox>
+
         <lightning-input-field field-name="Job_Code_3__c"></lightning-input-field>
         <lightning-button variant="brand" type="submit" name="save" label="Save"></lightning-button>
         <lightning-button variant="neutral" type="reset" name="cancel" label="Cancel"></lightning-button>
@@ -10,18 +26,73 @@
 </template>
 
 
-
-import { LightningElement, api } from 'lwc';
+import { LightningElement, api, wire, track } from 'lwc';
+import { getPicklistValues, getObjectInfo } from 'lightning/uiObjectInfoApi';
 import { ShowToastEvent } from 'lightning/platformShowToastEvent';
+import WORKORDERLINEITEM_OBJECT from '@salesforce/schema/WorkOrderLineItem';
+import JOB_CODE_1_FIELD from '@salesforce/schema/WorkOrderLineItem.Job_Code_1__c';
+import JOB_CODE_2_FIELD from '@salesforce/schema/WorkOrderLineItem.Job_Code_2__c';
 
-export default class JobCodeEditForm extends LightningElement {
+export default class DependentPicklistForm extends LightningElement {
     @api recordId;
+    @track jobCode1;
+    @track jobCode2;
+    @track jobCode1Options = [];
+    @track jobCode2Options = [];
+
+    @wire(getObjectInfo, { objectApiName: WORKORDERLINEITEM_OBJECT })
+    objectInfo;
+
+    @wire(getPicklistValues, { recordTypeId: '$objectInfo.data.defaultRecordTypeId', fieldApiName: JOB_CODE_1_FIELD })
+    jobCode1PicklistValues({ error, data }) {
+        if (data) {
+            this.jobCode1Options = data.values;
+        } else if (error) {
+            this.showToast('Error loading Job Code 1 picklist values', error.body.message, 'error');
+        }
+    }
+
+    @wire(getPicklistValues, { recordTypeId: '$objectInfo.data.defaultRecordTypeId', fieldApiName: JOB_CODE_2_FIELD })
+    jobCode2PicklistValues({ error, data }) {
+        if (data) {
+            this.allJobCode2Options = data.values;
+            this.updateJobCode2Options();
+        } else if (error) {
+            this.showToast('Error loading Job Code 2 picklist values', error.body.message, 'error');
+        }
+    }
+
+    handleJobCode1Change(event) {
+        this.jobCode1 = event.detail.value;
+        this.updateJobCode2Options();
+    }
+
+    updateJobCode2Options() {
+        if (this.allJobCode2Options && this.jobCode1) {
+            this.jobCode2Options = this.allJobCode2Options.filter(option => option.validFor.includes(this.jobCode1));
+        } else {
+            this.jobCode2Options = [];
+        }
+    }
+
+    handleJobCode2Change(event) {
+        this.jobCode2 = event.detail.value;
+    }
 
     handleSuccess(event) {
         const evt = new ShowToastEvent({
             title: 'Success',
             message: 'Job codes updated successfully!',
             variant: 'success',
+        });
+        this.dispatchEvent(evt);
+    }
+
+    showToast(title, message, variant) {
+        const evt = new ShowToastEvent({
+            title: title,
+            message: message,
+            variant: variant,
         });
         this.dispatchEvent(evt);
     }
