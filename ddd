@@ -1,0 +1,512 @@
+import { LightningElement, track, api } from 'lwc';
+import { ShowToastEvent } from 'lightning/platformShowToastEvent';
+import makeMockApiCall from '@salesforce/apex/AssetOnboardingController.makeMockApiCall';
+import isSerialIdLinked from '@salesforce/apex/AssetOnboardingController.isSerialIdLinked';
+import uploadFile from '@salesforce/apex/AssetOnboardingController.saveAttachment';
+import transferAsset from '@salesforce/apex/AssetOnboardingController.transfertAnAsset';
+import getProductDetailsBasedOnId from '@salesforce/apex/AssetOnboardingController.getProductDetails';
+import updateAssetDetailsWithWorkOrder from '@salesforce/apex/AssetOnboardingController.updateAssetDetailsWithWorkOrder';
+import { getBarcodeScanner } from 'lightning/mobileCapabilities';
+
+export default class AssetOnboarding extends LightningElement {
+    @track itemCode = '';
+    @track serialCode = '';
+    barcodeScanner;
+    @api recordId;
+    @track isSerialIdLinkedResult = false;
+    @track isItemCodeDisabled = false;
+    @track isSerialCodeDisabled = false;
+    @track previousAssetId;
+    @track previousAccount;
+    @track isLoading = false;
+    @track showProductDetails = false;
+    @track productDetails;
+
+    @track dateOfPurchase;
+    @track dateOfInstallation;
+    @track salesProductCode;
+    @track invoiceNumber;
+    @track warrantyStartDate;
+    @track warrantyEndDate;
+    @track sourceOfPurchase;
+    @track remarks;
+    @track rentalAsset = false;
+    productId;
+
+    connectedCallback() {
+        this.barcodeScanner = getBarcodeScanner();
+    }
+
+    handleInputChangesCode(event) {
+        this.itemCode = event.target.value;
+    }
+
+    handleInputChangeSerialCode(event) {
+        this.serialCode = event.target.value;
+    }
+
+    handleInputChange(event) {
+        const field = event.target.label.replace(/ /g, '');
+        this[field.charAt(0).toLowerCase() + field.slice(1)] = event.target.value;
+    }
+
+    handleCheckboxChange(event) {
+        this.rentalAsset = event.target.checked;
+    }
+
+    handleFileUpload(event) {
+        const file = event.target.files[0];
+        const reader = new FileReader();
+        
+        reader.onload = () => {
+            this.fileData = {
+                fileName: file.name,
+                base64Data: reader.result.split(',')[1]
+            };
+            this.handleSaveDocument(); 
+        };
+
+        reader.readAsDataURL(file);
+    }
+    
+    handleSaveDocument() {
+        if (!this.fileData) {
+            return;
+        }
+        this.isLoading = true;
+        uploadFile({ parentId: this.recordId, fileName: this.fileData.fileName, base64Data: this.fileData.base64Data })
+            .then(result => {
+                this.showSuccessToast('Document uploaded successfully');
+            })
+            .catch(error => {
+                this.showToast('Error', error.body.message, 'error');
+            })
+            .finally(() => {
+                this.isLoading = false;
+            });
+    }
+
+    handleScanItemCode() {
+        this.scanCode('itemCode');
+    }
+
+    handleScanSerialCode() {
+        this.scanCode('serialCode');
+    }
+
+    scanCode(field) {
+        if (this.barcodeScanner.isAvailable()) {
+            let scanningOptions = {
+                barcodeTypes: ["code128", "code39", "code93", "ean13", "ean8", "upca", "upce", "qr", "datamatrix", "itf", "pdf417"], 
+                instructionText: "Position barcode in the scanner view.\nPress x to stop.",
+                successText: "Successful Scan!"
+            };
+            this.barcodeScanner.scan(scanningOptions)
+                .then((results) => {
+                    this[field] = results[0].value;
+                    this[`is${field.charAt(0).toUpperCase() + field.slice(1)}Disabled`] = true;
+
+                    // Force the UI to update
+                    this.template.querySelector(`lightning-input[data-id="${field}"]`).value = this[field];
+                })
+                .catch((error) => {
+                    this.showToast('Error', error.body.message, 'error');
+                })
+                .finally(() => {
+                    this.barcodeScanner.dismiss();
+                });
+        } else {
+            this.showToast('Error', 'Barcode scanner is not available', 'error');
+        }
+    }
+
+    handleCallout() {
+        if (!this.serialCode) {
+            this.showToast('Warning', 'Please enter a value in the serial code input field.', 'warning');
+            return;
+        }
+
+        this.isLoading = true;
+        isSerialIdLinked({ serialId: this.serialCode })
+            .then(result => {
+                this.isSerialIdLinkedResult = result.isLinked;
+                this.previousAssetId = result.recordId;
+                this.previousAccount = result.AccountId;
+                if (result.isLinked) {
+                    this.showToast('Warning', 'The scanned serial ID is already linked with an existing asset.', 'warning');
+                } else {
+                    this.makeCallout();
+                }
+            })
+            .catch(error => {
+                this.showToast('Error', error.body.message, 'error');
+            })
+            .finally(() => {
+                this.isLoading = false;
+            });
+    }
+
+    handleTransferClick() {
+        this.isLoading = true;
+        transferAsset({ recordID: this.recordId, previousAssetId: this.previousAssetId, accountId: this.previousAccount }).then(result => {
+            this.showToast('Success', result, 'success');
+        }).catch(error => {
+            this.showToast('Error', error.body.message, 'error');
+        }).finally(() => {
+            this.isLoading = false;
+        });
+    }
+
+    makeCallout() {
+        makeMockApiCall({ qrCodes: [this.itemCode], recordId: this.recordId })
+            .then(result => {
+                const parsedResult = JSON.parse(result);
+                if (parsedResult && parsedResult.LstProductDetailsApiList && parsedResult.LstProductDetailsApiList.length > 0) {
+                    const qrCodeResponse = parsedResult.LstProductDetailsApiList[0];
+                    if (qrCodeResponse.Status === 'INVALID') {
+                        this.showToast('Error', qrCodeResponse.ResponseMessage, 'error');
+                    } else {
+                        this.fetchProductDetails(qrCodeResponse.ProductCode);
+                    }
+                } else {
+                    this.showToast('Error', 'No product details found in the response', 'error');
+                }
+            })
+            .catch(error => {
+                this.showToast('Error', error.body.message, 'error');
+            })
+            .finally(() => {
+                this.isLoading = false;
+            });
+    }
+
+    fetchProductDetails(productCode) {
+        getProductDetailsBasedOnId({ productCode })
+            .then(result => {
+                this.productDetails = result;
+                this.productId = result.Id;
+                this.showProductDetails = true;
+            })
+            .catch(error => {
+                this.showToast('Error', error.body.message, 'error');
+            });
+    }
+
+    handleSave() {
+        this.isLoading = true;
+        updateAssetDetailsWithWorkOrder({
+            workOrderLineItemId: this.recordId,
+            dateOfPurchase: this.dateOfPurchase,
+            dateOfInstallation: this.dateOfInstallation,
+            salesProductCode: this.salesProductCode,
+            invoiceNumber: this.invoiceNumber,
+            warrantyStartDate: this.warrantyStartDate,
+            warrantyEndDate: this.warrantyEndDate,
+            sourceOfPurchase: this.sourceOfPurchase,
+            remarks: this.remarks,
+            rentalAsset: this.rentalAsset,
+            productId: this.productId,
+            serialCode: this.serialCode,
+            itemCode: this.itemCode
+        })
+            .then(() => {
+                this.showSuccessToast('Product details saved successfully');
+                this.showProductDetails = false; // Hide product details screen after save
+            })
+            .catch(error => {
+                this.showToast('Error', error.body.message, 'error');
+            })
+            .finally(() => {
+                this.isLoading = false;
+            });
+    }
+
+    showToast(title, message, variant) {
+        const event = new ShowToastEvent({
+            title: title,
+            message: message,
+            variant: variant
+        });
+        this.dispatchEvent(event);
+    }
+
+    showSuccessToast(message) {
+        this.showToast('Success', message, 'success');
+    }
+}
+
+
+
+public class AssetOnboardingController {
+    @AuraEnabled(cacheable = true)
+    public static String makeMockApiCall(List<String> qrCodes, String recordId) {
+        return QRCodeService.sendQRCodeAsJson(qrCodes);
+    }
+    
+    @AuraEnabled(cacheable=true)
+    public static Map<String, Object> isSerialIdLinked(String serialId) {
+        Map<String, Object> result = new Map<String, Object>();
+        result.put('isLinked', false);
+        result.put('recordId', null);
+        
+        if (String.isBlank(serialId)) {
+            return result; // Return false and null if serialId is null or empty
+        }
+        
+        List<Asset> linkedAssets = [SELECT Id, AccountId FROM Asset WHERE SerialNumber = :serialId LIMIT 1];
+        
+        if (!linkedAssets.isEmpty()) {
+            result.put('isLinked', true);
+            result.put('recordId', linkedAssets[0].Id);
+            result.put('previousAccount', linkedAssets[0].AccountId);
+        }
+        
+        return result;
+    }
+    
+    @AuraEnabled(cacheable=false)
+    public static void saveAttachment(Id parentId, String fileName, String base64Data) {
+        try {
+            List<WorkOrderLineItem> woliList = [SELECT AssetId FROM WORKORDERLINEITEM WHERE Id =:parentId];
+            Blob fileBlob = EncodingUtil.base64Decode(base64Data);
+            List<ContentVersion> contentVersions = new List<ContentVersion>();            
+            ContentVersion cv = new ContentVersion(
+                Title = fileName,
+                PathOnClient = fileName,
+                VersionData = EncodingUtil.base64Decode(base64Data),
+                FirstPublishLocationId = woliList[0].AssetId
+            );
+            contentVersions.add(cv);
+            insert contentVersions;
+            
+        } catch (Exception ex) {
+            throw new AuraHandledException('Error occurred while saving attachment: ' + ex.getMessage());
+        }  
+    }
+    
+    @AuraEnabled(cacheable=false)
+    public static void transfertAnAsset(Id recordID, Id previousAssetId, Id accountId){
+        List<WorkOrderLineItem> woliRecords = [SELECT CreatedById, AssetId, Asset.AccountId FROM WorkOrderLineItem WHERE Id = :recordID];
+        if (woliRecords[0].AssetId != null) {
+            Id appliancesRecordTypeId = Schema.SObjectType.Task.getRecordTypeInfosByName().get('Appliances').getRecordTypeId();
+            List<Task> tasksToInsert = new List<Task>();
+            Task taskRecord = new Task();
+            taskRecord.Task_Type__c = 'Call';
+            taskRecord.status = 'Requested for Transfer of Asset';
+            taskRecord.Subject = 'Call';
+            taskRecord.Customer_Name__c = woliRecords[0].Asset.AccountId;
+            taskRecord.WhatId = woliRecords[0].AssetId;
+            taskRecord.OwnerId = woliRecords[0].CreatedById;
+            taskRecord.Previous_Asset__c = previousAssetId;
+            taskRecord.ActivityDate = Date.today();
+            taskRecord.RecordTypeId = appliancesRecordTypeId;
+            tasksToInsert.add(taskRecord);
+            
+            if (!tasksToInsert.isEmpty()) {
+                Insert tasksToInsert;
+            }
+            
+            CustomNotificationType notificationType = [
+                SELECT Id, DeveloperName
+                FROM CustomNotificationType
+                WHERE DeveloperName = 'Cancelled_SA_Notification_to_ASP' LIMIT 1
+            ];
+            
+            Messaging.CustomNotification notification = new Messaging.CustomNotification();
+            
+            notification.setTitle('Task Assigned to You');
+            notification.setBody('A new task has been assigned to you. Please review it.');
+            notification.setTargetId(tasksToInsert[0].Id); 
+            notification.setNotificationTypeId(notificationType.Id);
+            
+            Set<String> targetIds = new Set<String>();
+            targetIds.add(woliRecords[0].CreatedById); 
+            
+            try {
+                notification.send(targetIds);
+            }
+            catch (Exception e) {
+                System.debug('Problem sending notification: ' + e.getMessage());
+            }
+            
+            List<Id> contentDocumentIdList = new List<Id>();
+            for (ContentDocumentLink cont : [SELECT LinkedEntityId, ContentDocumentId FROM ContentDocumentLink WHERE LinkedEntityId = :woliRecords[0].AssetId]) {    
+                contentDocumentIdList.add(cont.ContentDocumentId);
+            }
+            
+            List<ContentVersion> contentVersionList = new List<ContentVersion>();
+            for (ContentVersion contentVersionObj : [SELECT Title, PathOnClient, VersionData, ContentDocumentId FROM ContentVersion WHERE ContentDocumentId = :contentDocumentIdList]){
+                ContentVersion cv = new ContentVersion(
+                    Title = contentVersionObj.Title,
+                    PathOnClient = contentVersionObj.PathOnClient,
+                    VersionData = contentVersionObj.VersionData,
+                    FirstPublishLocationId = previousAssetId
+                );
+                contentVersionList.add(cv);
+            }
+            
+            try {
+                Insert contentVersionList;
+            }
+            catch (Exception exc) {
+                System.debug('Error-->' + exc);
+            }
+        }
+    }
+    
+    @AuraEnabled
+    public static Product2 getProductDetails(String productCode) {
+        return [SELECT Id, Name, ProductCode, Product_Category__c FROM Product2 WHERE ProductCode = :productCode LIMIT 1];
+    }
+
+    @AuraEnabled
+    public static void updateAssetDetails(String workOrderLineItemId, String dateOfPurchase, String dateOfInstallation, String salesProductCode,
+                                          String invoiceNumber, String warrantyStartDate, String warrantyEndDate, String sourceOfPurchase,
+                                          String remarks, Boolean rentalAsset, Id productId, String serialCode, String itemCode) {
+        WorkOrderLineItem woli = [SELECT AssetId FROM WorkOrderLineItem WHERE Id = :workOrderLineItemId LIMIT 1];
+        Asset asset = [SELECT Id, Date_of_Commissioning__c, Installation_time__c, Invoice_Number__c, 
+                              Product_Purchased_Warranty_Start_Date__c, Product_Purchased_Warranty_End_Date__c, 
+                              Rental_Asset__c, Product2Id, SerialNumber, Item_Code__c 
+                       FROM Asset 
+                       WHERE Id = :woli.AssetId LIMIT 1];
+        if (dateOfPurchase != null && dateOfPurchase != '') {
+            asset.Date_of_Commissioning__c = Date.valueOf(dateOfPurchase);
+        }
+        if (dateOfInstallation != null && dateOfInstallation != '') {
+            asset.Installation_time__c = Date.valueOf(dateOfInstallation);
+        }
+        if (salesProductCode != null && salesProductCode != '') {
+           // asset.Sales_Product_Code__c = salesProductCode;
+        }
+        if (invoiceNumber != null && invoiceNumber != '') {
+            asset.Invoice_Number__c = invoiceNumber;
+        }
+        if (warrantyStartDate != null && warrantyStartDate != '') {
+            asset.Product_Purchased_Warranty_Start_Date__c = Date.valueOf(warrantyStartDate);
+        }
+        if (warrantyEndDate != null && warrantyEndDate != '') {
+            asset.Product_Purchased_Warranty_End_Date__c = Date.valueOf(warrantyEndDate);
+        }
+        if (sourceOfPurchase != null && sourceOfPurchase != '') {
+         //   asset.Source_of_Purchase__c = sourceOfPurchase;
+        }
+        if (remarks != null && remarks != '') {
+          //  asset.Remarks__c = remarks;
+        }
+        if (rentalAsset != null) {
+            asset.Rental_Asset__c = rentalAsset;
+        }
+        if (productId != null) {
+            asset.Product2Id = productId;
+        }
+        if (serialCode != null && serialCode != '') {
+            asset.SerialNumber = serialCode;
+        }
+        if (itemCode != null && itemCode != '') {
+            asset.Item_Code__c = itemCode;
+        }
+        update asset;
+    }
+    
+    @AuraEnabled
+    public static Product2 getProductDetailsBasedOnId(Id productId) {
+        return [SELECT Id, Name, ProductCode, Product_Sub_Category__c FROM Product2 WHERE Id = :productId LIMIT 1];
+    }
+
+    @AuraEnabled
+    public static void updateAssetDetailsWithWorkOrder(Id workOrderLineItemId, String dateOfPurchase, String dateOfInstallation, String salesProductCode,
+                                          String invoiceNumber, String warrantyStartDate, String warrantyEndDate, String sourceOfPurchase,
+                                          String remarks, Boolean rentalAsset, Id productId, String serialCode, String itemCode) {
+        WorkOrderLineItem woli = [SELECT AssetId FROM WorkOrderLineItem WHERE Id = :workOrderLineItemId LIMIT 1];
+        Asset asset = [SELECT Id FROM Asset WHERE Id = :woli.AssetId LIMIT 1];
+
+        if (dateOfPurchase != null && dateOfPurchase != '') {
+            asset.Date_of_Commissioning__c = Date.valueOf(dateOfPurchase);
+        }
+        if (dateOfInstallation != null && dateOfInstallation != '') {
+            asset.Installation_time__c = Date.valueOf(dateOfInstallation);
+        }
+        if (salesProductCode != null) {
+          //  asset.Sales_Product_Code__c = salesProductCode;
+        }
+        if (invoiceNumber != null) {
+            asset.Invoice_Number__c = invoiceNumber;
+        }
+        if (warrantyStartDate != null && warrantyStartDate != '') {
+            asset.Product_Purchased_Warranty_Start_Date__c = Date.valueOf(warrantyStartDate);
+        }
+        if (warrantyEndDate != null && warrantyEndDate != '') {
+            asset.Product_Purchased_Warranty_End_Date__c = Date.valueOf(warrantyEndDate);
+        }
+        if (sourceOfPurchase != null) {
+           // asset.Source_of_Purchase__c = sourceOfPurchase;
+        }
+        if (remarks != null) {
+         //   asset.Remarks__c = remarks;
+        }
+        asset.Rental_Asset__c = rentalAsset;
+        if (productId != null) {
+            asset.Product2Id = productId;
+        }
+        if (serialCode != null && serialCode != '') {
+            asset.SerialNumber = serialCode;
+        }
+        if (itemCode != null && itemCode != '') {
+            asset.Item_Code__c = itemCode;
+        }
+
+        update asset;
+    }
+}
+
+
+<template>
+    <template if:false={showProductDetails}>
+        <lightning-card class="slds-p-around_medium">
+            <!-- Spinner Section -->
+            <template if:true={isLoading}>
+                <div class="spinner-overlay">
+                    <lightning-spinner alternative-text="Loading" size="large"></lightning-spinner>
+                </div>
+            </template>
+
+            <!-- Form Section -->
+            <div class="slds-p-around_medium">
+                <lightning-input class="slds-m-top_medium" label="Enter Item Code" value={itemCode} data-id="itemCode" onchange={handleInputChangesCode} disabled={isItemCodeDisabled}></lightning-input>
+                <lightning-button class="slds-m-top_medium" label="Scan Item Code" onclick={handleScanItemCode}></lightning-button>
+
+                <lightning-input class="slds-m-top_medium" label="Enter Serial Code" value={serialCode} data-id="serialCode" onchange={handleInputChangeSerialCode} disabled={isSerialCodeDisabled}></lightning-input>
+                <lightning-button class="slds-m-top_medium" label="Scan Serial Code" onclick={handleScanSerialCode}></lightning-button>
+
+                <lightning-input class="slds-m-top_medium" type="file" label="Upload Invoice" onchange={handleFileUpload}></lightning-input>
+                <lightning-button class="slds-m-top_medium" label="Submit" onclick={handleCallout}></lightning-button>
+                <template if:true={isSerialIdLinkedResult}>
+                    <lightning-button class="slds-m-top_medium" label="Transfer the Asset" onclick={handleTransferClick}></lightning-button>
+                </template>
+            </div>
+        </lightning-card>
+    </template>
+
+    <template if:true={showProductDetails}>
+        <lightning-card title="Product Details" class="slds-p-around_medium">
+            <div class="slds-p-around_medium">
+                <lightning-input class="slds-m-top_medium" label="Product Name" value={productDetails.Name} disabled></lightning-input>
+                <lightning-input class="slds-m-top_medium" label="Product Code" value={productDetails.ProductCode} disabled></lightning-input>
+                <lightning-input class="slds-m-top_medium" label="Product Category" value={productDetails.Product_Category__c} disabled></lightning-input>
+
+                <!-- Editable Fields -->
+                <lightning-input class="slds-m-top_medium" type="date" label="Date of Purchase" value={dateOfPurchase} onchange={handleInputChange}></lightning-input>
+                <lightning-input class="slds-m-top_medium" type="date" label="Date of Installation" value={dateOfInstallation} onchange={handleInputChange}></lightning-input>
+                <lightning-input class="slds-m-top_medium" label="Sales Product Code" value={salesProductCode} onchange={handleInputChange}></lightning-input>
+                <lightning-input class="slds-m-top_medium" label="Invoice Number" value={invoiceNumber} onchange={handleInputChange}></lightning-input>
+                <lightning-input class="slds-m-top_medium" type="date" label="Warranty Start Date" value={warrantyStartDate} onchange={handleInputChange}></lightning-input>
+                <lightning-input class="slds-m-top_medium" type="date" label="Warranty End Date" value={warrantyEndDate} onchange={handleInputChange}></lightning-input>
+                <lightning-input class="slds-m-top_medium" label="Source of Purchase" value={sourceOfPurchase} onchange={handleInputChange}></lightning-input>
+                <lightning-textarea class="slds-m-top_medium" label="Remarks" value={remarks} onchange={handleInputChange}></lightning-textarea>
+                <lightning-input class="slds-m-top_medium" type="checkbox" label="Rental Asset" checked={rentalAsset} onchange={handleCheckboxChange}></lightning-input>
+
+                <lightning-button class="slds-m-top_medium" label="Save" onclick={handleSave}></lightning-button>
+            </div>
+        </lightning-card>
+    </template>
+</template>
