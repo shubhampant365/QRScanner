@@ -1,0 +1,200 @@
+<template>
+    <lightning-card title="Job Code Picker" icon-name="custom:custom14">
+        <div class="slds-p-around_medium">
+            <template if:true={isLoading}>
+                <lightning-spinner alternative-text="Loading" size="medium"></lightning-spinner>
+            </template>
+            <template if:false={isLoading}>
+                <template if:true={jobCodeOptions}>
+                    <lightning-combobox
+                        name="jobCodes"
+                        label={picklistLabel}
+                        value={selectedJobCodeId}
+                        placeholder="Select a Job Code"
+                        options={jobCodeOptions}
+                        onchange={handleChange}>
+                    </lightning-combobox>
+                </template>
+                <template if:true={error}>
+                    <p class="slds-text-color_error">{error}</p>
+                </template>
+                <div class="slds-m-top_medium">
+                    <template if:true={showNext}>
+                        <lightning-button label="Next" onclick={handleNext} class="slds-m-right_small"></lightning-button>
+                    </template>
+                    <template if:true={showSave}>
+                        <lightning-button label="Save" onclick={handleSave} variant="brand"></lightning-button>
+                    </template>
+                </div>
+            </template>
+        </div>
+    </lightning-card>
+</template>
+
+
+
+
+import { LightningElement, api, wire, track } from 'lwc';
+import { ShowToastEvent } from 'lightning/platformShowToastEvent';
+import getJobCodeMasterRecords from '@salesforce/apex/JobCodeMasterController.getJobCodeMasterRecords';
+import getChildJobCodeMasterRecords from '@salesforce/apex/JobCodeMasterController.getChildJobCodeMasterRecords';
+import saveJobCodes from '@salesforce/apex/JobCodeMasterController.saveJobCodes';
+
+export default class JobCodePicker extends LightningElement {
+    @api recordId;
+    @track jobCodeOptions;
+    @track selectedJobCodeId;
+    @track selectedJobCodeLabel;
+    @track error;
+    @track step = 1;
+    @track firstSelection = {};
+    @track secondSelection = {};
+    @track thirdSelection = {};
+    @track isLoading = false;
+
+    get showNext() {
+        return this.step < 3;
+    }
+
+    get showSave() {
+        return this.step === 3;
+    }
+
+    get picklistLabel() {
+        if (this.step === 1) return 'Job Code 1';
+        if (this.step === 2) return 'Job Code 2';
+        if (this.step === 3) return 'Job Code 3';
+        return 'Job Code';
+    }
+
+    @wire(getJobCodeMasterRecords, { workOrderId: '$recordId' })
+    wiredJobCodeMasterRecords({ error, data }) {
+        if (data) {
+            this.jobCodeOptions = data.map(record => ({
+                label: record.Name,
+                value: record.Id
+            }));
+            this.error = undefined;
+        } else if (error) {
+            this.error = error.body.message;
+            this.jobCodeOptions = undefined;
+        }
+    }
+
+    handleChange(event) {
+        this.selectedJobCodeId = event.detail.value;
+        const selectedOption = this.jobCodeOptions.find(option => option.value === this.selectedJobCodeId);
+        this.selectedJobCodeLabel = selectedOption ? selectedOption.label : null;
+    }
+
+    handleNext() {
+        if (!this.selectedJobCodeId) {
+            this.showToast('Error', 'Please select a Job Code before proceeding.', 'error');
+            return;
+        }
+
+        if (this.step === 1) {
+            this.firstSelection = { id: this.selectedJobCodeId, label: this.selectedJobCodeLabel };
+        } else if (this.step === 2) {
+            this.secondSelection = { id: this.selectedJobCodeId, label: this.selectedJobCodeLabel };
+        }
+
+        this.isLoading = true;
+        getChildJobCodeMasterRecords({ parentId: this.selectedJobCodeId })
+            .then(data => {
+                if (data && data.length > 0) {
+                    this.jobCodeOptions = data.map(record => ({
+                        label: record.Name,
+                        value: record.Id
+                    }));
+                    this.selectedJobCodeId = null; // Reset the selected job code for the next step
+                    this.selectedJobCodeLabel = null;
+                    this.step++;
+                    this.error = undefined;
+                } else {
+                    this.showToast('Info', 'No further Job Codes available.', 'info');
+                }
+                this.isLoading = false;
+            })
+            .catch(error => {
+                this.error = error.body.message;
+                this.showToast('Error', this.error, 'error');
+                this.isLoading = false;
+            });
+    }
+
+    handleSave() {
+        if (!this.selectedJobCodeId) {
+            this.showToast('Error', 'Please select a Job Code before saving.', 'error');
+            return;
+        }
+
+        this.thirdSelection = { id: this.selectedJobCodeId, label: this.selectedJobCodeLabel };
+
+        saveJobCodes({ 
+            workOrderId: this.recordId, 
+            jobCode1: this.firstSelection.label, 
+            jobCode2: this.secondSelection.label, 
+            jobCode3: this.thirdSelection.label 
+        })
+        .then(() => {
+            this.showToast('Success', 'Job Code selection saved successfully.', 'success');
+        })
+        .catch(error => {
+            this.error = error.body.message;
+            this.showToast('Error', this.error, 'error');
+        });
+    }
+
+    showToast(title, message, variant) {
+        const event = new ShowToastEvent({
+            title: title,
+            message: message,
+            variant: variant
+        });
+        this.dispatchEvent(event);
+    }
+}
+
+
+
+
+
+public with sharing class JobCodeMasterController {
+    @AuraEnabled(cacheable=true)
+    public static List<JobCodeMaster__c> getJobCodeMasterRecords(String workOrderId) {
+        WorkOrder workOrder = [SELECT Id, productCat__c FROM WorkOrder WHERE Id = :workOrderId LIMIT 1];
+        JobCodeMaster__c parentRecord = [
+            SELECT Id, Name
+            FROM JobCodeMaster__c
+            WHERE Name = :workOrder.productCat__c
+            LIMIT 1
+        ];
+        List<JobCodeMaster__c> childRecords = [
+            SELECT Id, Name
+            FROM JobCodeMaster__c
+            WHERE JobCodeMaster__c = :parentRecord.Id
+        ];
+        return childRecords;
+    }
+
+    @AuraEnabled(cacheable=true)
+    public static List<JobCodeMaster__c> getChildJobCodeMasterRecords(String parentId) {
+        List<JobCodeMaster__c> childRecords = [
+            SELECT Id, Name
+            FROM JobCodeMaster__c
+            WHERE JobCodeMaster__c = :parentId
+        ];
+        return childRecords;
+    }
+
+    @AuraEnabled
+    public static void saveJobCodes(String workOrderId, String jobCode1, String jobCode2, String jobCode3) {
+        Job_Code__c jobCode = new Job_Code__c(
+            Job_Code_1__c = jobCode1,
+            Job_Code_2__c = jobCode2,
+            Job_Code_3__c = jobCode3
+        );
+        insert jobCode;
+    }
+}
